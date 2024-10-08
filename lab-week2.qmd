@@ -1,0 +1,185 @@
+---
+title: "EDS 223 Week 2"
+author: "Tom Gibbens-Matsuyama"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+# Load libraries
+```{r}
+rm(list = ls())
+library(sf)
+library(tidyverse)
+library(spData)
+library(tmap)
+```
+
+# Creating a geographic system
+```{r}
+# creating sf data, usually don't do this but good for understanding
+london_point <-st_point(c(0.1, 51.5))
+
+# crs = coordinate reference system 
+london_geom <- st_sfc(london_point, crs = 4326)
+
+# create a dataframe
+london_attribute <- data.frame(
+  name = "london",
+  temperature = 25,
+  date = as.Date("2017-06-21")
+)
+
+london_sf <- st_sf(london_attribute, geometry = london_geom)
+
+# good to regulary check class
+class(london_sf)
+
+st_crs(london_sf)$IsGeographic
+```
+
+# Load data object
+```{r}
+# geographic data treated like a data frame, can do summary stats on variables
+world <- spData::world
+
+names(world)
+
+summary(world$lifeExp)
+```
+
+```{r}
+# hard to drop geometry column unless you really want to (next code chunk)
+world_df <- world %>% 
+  select(-geom)
+
+wolrd_df <- world %>% 
+  select(continent)
+```
+
+# Dropping the geometry column
+```{r}
+world_df <- st_drop_geometry(world)
+
+class(world_df)
+```
+
+## Reprojecting data
+```{r}
+london_proj <- data.frame(x = 53000, y = 180000) %>% 
+  st_as_sf(coords = c("x", "y"), crs = "EPSG:27700")
+
+# Are these coordinate reference systems the same???
+st_crs(london_proj) == st_crs(london_sf)
+
+# ******** Line of Code Important ************************
+london_sf_transofrm <- st_transform(london_sf, crs = st_crs(london_proj))
+```
+
+```{r}
+if(st_crs(london_sf_transofrm) == st_crs(london_attribute)) {
+  print("coordinate reference systems of datasets match")
+} else {
+  warning("coordinate reference systems do not match")
+}
+```
+
+```{r}
+tm_shape(world, projection = 8857) +
+  tm_fill(col = "area_km2")
+```
+
+```{r}
+# using mercadian?? (spelling wrong?) projection
+tm_shape(world, projection = 3395) +
+  tm_fill(col = "area_km2")
+```
+
+## Vector attribute subsetting
+```{r}
+# dplyr select function
+
+world %>% 
+  select(name_long, pop)
+
+world %>% 
+  select(-subregion)
+
+world %>% 
+  select(name = name_long, population = pop)
+```
+
+```{r}
+world1 <- world %>% 
+  filter(area_km2 < 10000)
+```
+
+```{r}
+world %>% 
+  filter(continent == "Asia") %>% 
+  select(name_long, continent, lifeExp) %>% 
+  slice_max(lifeExp) %>% 
+  st_drop_geometry()
+```
+
+```{r}
+world %>% 
+  group_by(continent) %>% 
+  summarise(population = sum(pop, na.rm = TRUE)) %>% 
+  st_drop_geometry()
+```
+
+# Join with vector attributes
+```{r}
+coffee_data <- spData::coffee_data
+
+nrow(coffee_data)
+nrow(world)
+```
+
+```{r}
+world_coffee <- left_join(world, coffee_data, by = "name_long")
+```
+
+```{r}
+tm_shape(world_coffee) +
+  tm_fill(col = "coffee_production_2017")
+```
+
+```{r}
+world_coffee_inner <- inner_join(world, coffee_data, by = "name_long")
+
+if(nrow(world_coffee_inner) < nrow(coffee_data)) {
+  warning("inner join does not match original data. potential data loss during join")
+}
+```
+
+```{r}
+setdiff(coffee_data$name_long, world$name_long)
+```
+
+```{r}
+# Searching for a string in a dataframe
+drc <- stringr::str_subset(world$name_long, "Dem*.+Congo")
+
+coffee_data$name_long[stringr::str_detect(coffee_data$name_long, "Congo")] <- drc
+
+world_coffee_inner <- inner_join(world, coffee_data, by = "name_long")
+
+if(nrow(world_coffee_inner) < nrow(coffee_data)) {
+  warning("inner join does not match original data. potential data loss during join")
+}
+```
+
+```{r}
+tm_shape(world_coffee_inner) +
+  tm_polygons(fill = "coffee_production_2017",
+              title = "Coffee production (2017)") +
+  tm_layout(legend.outside = TRUE)
+```
+
+```{r}
+coffee_world <- left_join(coffee_data, world, by = "name_long")
+class(coffee_world)
+```
+
