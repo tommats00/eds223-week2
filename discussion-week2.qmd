@@ -1,0 +1,82 @@
+---
+title: "Week 2 Discussion"
+author: "Tom Gibbens-Matsuyama"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+# Load libraries
+
+```{r}
+library(here)
+library(tidyverse)
+library(sf)
+library(tmap)
+library(here)
+library(tmap)
+```
+
+## Read in data for Colombia's ecoregions, roads, and bird observations
+
+```{r}
+eco_regions <- st_read(here("data", "data", "Colombia", "Colombia.shp" ))
+roads <- st_read(here("data", "data", "RDLINE_colombia", "RDLINE_colombia.shp"))
+```
+
+```{r}
+# renaming lat and long columns when we read it in
+
+birds <- read_csv(here("data", "data", "dataves.csv")) %>% 
+  as_tibble() %>% 
+  rename(long = decimal_longitude) %>% 
+  rename(lat = decimal_latitude)
+
+birds <- birds %>% 
+  st_as_sf(coords = c("long", "lat"), crs = 4326)
+```
+
+
+```{r}
+# 2. Check the class() 
+class(birds)
+unique(sf::st_geometry_type(eco_regions))
+```
+
+```{r}
+eco_andean <- eco_regions %>% 
+  mutate(N1_MacroBi = as.factor(N1_MacroBi)) %>% 
+  filter(N1_MacroBi == "Andean") 
+```
+
+```{r}
+tm_shape(eco_andean) +
+  tm_polygons() +
+  tm_layout(main.title = "Andean Region of Colombia")
+```
+
+```{r}
+st_crs(eco_regions)$units
+```
+
+```{r}
+st_crs(eco_regions) == st_crs(roads)
+```
+
+```{r}
+st_crs(eco_regions) == st_crs(birds)
+```
+
+```{r}
+aves <- st_transform(birds, crs = st_crs(eco_regions))
+```
+
+```{r}
+st_crs(eco_regions) == st_crs(aves)
+```
+
+```{r}
+
+```
+
